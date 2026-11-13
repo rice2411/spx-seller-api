@@ -1,0 +1,74 @@
+{
+  "name": "spx-seller-api",
+  "version": "0.1.0",
+  "description": "Unofficial SPX (Shopee Express Vietnam) seller API for Node.js — log in to the spx.vn seller portal, read wallet balance and transactions, list shipments, download labels, bulk-create shipments and track parcels.",
+  "license": "MIT",
+  "author": "rice2411",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rice2411/spx-seller-api.git"
+  },
+  "homepage": "https://github.com/rice2411/spx-seller-api#readme",
+  "bugs": {
+    "url": "https://github.com/rice2411/spx-seller-api/issues"
+  },
+  "keywords": [
+    "spx",
+    "spx-express",
+    "shopee-express",
+    "shopee",
+    "vietnam",
+    "logistics",
+    "shipping",
+    "tracking",
+    "seller",
+    "unofficial"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.11",
+    "eslint": "^10.14.0",
+    "prettier": "^3.10.0",
+    "tsup": "^9.0.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
+  }
+}

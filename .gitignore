@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+*.log
+cookies*.json
+session*.json
+.DS_Store
