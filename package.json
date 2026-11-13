@@ -1,6 +1,6 @@
 {
   "name": "spx-seller-api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Unofficial SPX (Shopee Express Vietnam) seller API for Node.js — log in to the spx.vn seller portal, read wallet balance and transactions, list shipments, download labels, bulk-create shipments and track parcels.",
   "license": "MIT",
   "author": "rice2411",

@@ -22,6 +22,12 @@ export interface SpxMassCreateInput {
   expect: number;
   /** Only upload the file and read the counts; never click "Create". */
   dryRun?: boolean;
+  /**
+   * Sender phone (any format: `0356621308`, `84356621308`, `356621308`). The page starts on the address book's DEFAULT
+   * sender; with this set, the matching address-book entry is picked before the import, and "Create" is NOT clicked
+   * unless the page shows that sender.
+   */
+  senderPhone?: string;
   userAgent?: string;
   signal?: AbortSignal;
 }
@@ -33,8 +39,17 @@ export interface SpxMassCreateResult {
   invalid: number;
   /** The "drop off at a service point" option (Gửi tại điểm) is selected. */
   dropOff: boolean;
+  /** Sender shown on the page ("Địa chỉ người gửi") when the run stopped or submitted — `null` if not read. */
+  sender?: SpxSender | null;
   /** Why nothing was submitted (when `submitted = false` outside `dryRun`). */
   reason: string | null;
+}
+
+export interface SpxSender {
+  name: string;
+  /** Digits only, as the page shows them (no leading 0 / 84). */
+  phone: string;
+  address: string;
 }
 
 const PAGE = `${SPX}/spx-admin/mass-order/create`;
@@ -61,6 +76,49 @@ const PICK_DROP_OFF = `(async () => {
   (radio.closest('label') || radio).click();
   await sleep(600);
   return radio.checked;
+})()`;
+
+/** Phone → the national significant number SPX shows (`0356621308` / `+84 356 621 308` → `356621308`). */
+const spxPhoneKey = (phone: string): string => phone.replace(/\D/g, '').replace(/^(84|0)/, '');
+
+/** Read the "Địa chỉ người gửi" (sender) block: Tên / Số điện thoại / Địa chỉ. */
+const READ_SENDER = `(() => {
+  const box = document.querySelector('.mass-creation-v2-sender-address .address-preview');
+  if (!box) return null;
+  const pick = (re) => {
+    const item = [...box.querySelectorAll('.address-preview-item')].find((el) => re.test(el.querySelector('.address-preview-item-label')?.innerText || ''));
+    return (item?.querySelector('.address-preview-item-value')?.innerText || '').trim();
+  };
+  return { name: pick(/t[eê]n/i), phone: pick(/[dđ]i[eệ]n tho[aạ]i/i).replace(/\\D/g, ''), address: pick(/[dđ][iị]a ch[iỉ]/i) };
+})()`;
+
+/**
+ * Pick the sender whose phone is `key` from the address book: "Sổ địa chỉ" → the radio of the matching entry →
+ * "Xác nhận". Returns 'ok' or what was missing.
+ */
+const pickSenderScript = (key: string) => `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const block = document.querySelector('.mass-creation-v2-sender-address');
+  const open = block && [...block.querySelectorAll('button')].find((b) => /s[oổ] [dđ][iị]a ch[iỉ]/i.test((b.innerText || '').trim()));
+  if (!open) return 'no-address-book-button';
+  open.click();
+  let modal = null;
+  for (let i = 0; i < 20 && !modal; i++) { await sleep(250); modal = document.querySelector('.address-book-modal'); }
+  if (!modal) return 'no-address-book';
+  for (let i = 0; i < 20 && !modal.querySelector('.address-book-item-content'); i++) await sleep(250);
+  const entry = [...modal.querySelectorAll('label')].find((l) => {
+    const digits = (l.querySelector('.phone')?.innerText || '').replace(/\\D/g, '').replace(/^(84|0)/, '');
+    return digits === ${JSON.stringify(key)};
+  });
+  const close = () => [...modal.querySelectorAll('.ssc-modal-footer button')].find((b) => /h[uủ]y/i.test(b.innerText || ''))?.click();
+  if (!entry) { close(); return 'sender-not-in-address-book'; }
+  (entry.querySelector('input[type=radio]') || entry).click();
+  await sleep(400);
+  const ok = [...modal.querySelectorAll('.ssc-modal-footer button')].find((b) => /x[aá]c nh[aậ]n/i.test(b.innerText || ''));
+  if (!ok) { close(); return 'no-confirm-button'; }
+  ok.click();
+  await sleep(1200);
+  return 'ok';
 })()`;
 
 /**
@@ -176,6 +234,24 @@ export async function createMassOrders(session: SpxSession, input: SpxMassCreate
       }
     }
 
+    // Sender: the page opens on the address book's DEFAULT entry — pick the requested one before importing.
+    const senderKey = input.senderPhone ? spxPhoneKey(input.senderPhone) : '';
+    const readSender = () => tab.eval<SpxSender | null>(READ_SENDER).catch(() => null);
+    let sender = await readSender();
+    if (senderKey && sender?.phone !== senderKey) {
+      const picked = await tab.eval<string>(pickSenderScript(senderKey)).catch((e) => String(e));
+      sender = await readSender();
+      if (sender?.phone !== senderKey)
+        return {
+          submitted: false,
+          ready: 0,
+          invalid: 0,
+          dropOff: false,
+          sender,
+          reason: `could not select sender ${senderKey} (${picked}; page shows ${sender ? `${sender.name} ${sender.phone}` : 'none'})`,
+        };
+    }
+
     await tab.eval<boolean>(PICK_DROP_OFF).catch(() => false);
     const up = await tab.eval<string>(uploadScript(input.base64, input.filename));
     if (up !== 'ok')
@@ -184,6 +260,7 @@ export async function createMassOrders(session: SpxSession, input: SpxMassCreate
         ready: 0,
         invalid: 0,
         dropOff: false,
+        sender,
         reason: `could not attach the file to the page (${up})`,
       };
 
@@ -214,7 +291,9 @@ export async function createMassOrders(session: SpxSession, input: SpxMassCreate
       if (stable >= 4 && now.ready + now.invalid === input.expect) break;
     }
     const sum = prev ?? { ready: 0, invalid: 0, seen: false };
-    const base = { ready: sum.ready, invalid: sum.invalid, dropOff };
+    // Read the sender again right before deciding — the import must not have swapped it back.
+    sender = await readSender();
+    const base = { ready: sum.ready, invalid: sum.invalid, dropOff, sender };
     if (!sum.seen) return { ...base, submitted: false, reason: 'the page showed no counts after the import' };
     if (sum.invalid > 0) return { ...base, submitted: false, reason: `portal reports ${sum.invalid} invalid rows` };
     if (sum.ready <= 0) return { ...base, submitted: false, reason: 'no row is ready' };
@@ -226,6 +305,12 @@ export async function createMassOrders(session: SpxSession, input: SpxMassCreate
       };
     }
     if (!dropOff) return { ...base, submitted: false, reason: 'could not select drop-off ("Gửi tại điểm")' };
+    if (senderKey && sender?.phone !== senderKey)
+      return {
+        ...base,
+        submitted: false,
+        reason: `sender on the page is ${sender ? `${sender.name} ${sender.phone}` : 'unreadable'}, expected ${senderKey}`,
+      };
     if (input.dryRun) return { ...base, submitted: false, reason: null };
 
     aborted();

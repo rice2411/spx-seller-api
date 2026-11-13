@@ -121,8 +121,9 @@ reports exactly `expect` ready rows and no invalid ones.
 | `base64` · `filename` | The `.xlsx` file |
 | `expect` | Number of rows — any mismatch stops before creating anything |
 | `dryRun` | Import and read the counts, never click Create |
+| `senderPhone` | Sender to pick from the address book (default: the address book's default sender) — Create is not clicked unless the page shows it |
 
-Returns `{ submitted, ready, invalid, dropOff, reason }` — `reason` explains why nothing was submitted.
+Returns `{ submitted, ready, invalid, dropOff, sender, reason }` — `reason` explains why nothing was submitted.
 
 ### Tracking
 

@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-13
+
+### Added
+
+- `createMassOrders`: `senderPhone` option — picks that sender from the portal's address book ("Sổ địa chỉ") before the
+  import and refuses to click Create unless the page shows it. Without it the page uses the address book's default
+  sender. The result now carries `sender` (`name`, `phone`, `address` as shown on the page).
+
 ## [0.1.0] - 2026-11-13
 
 ### Added
@@ -15,5 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parcel tracking (`getTracking`, `trackingUrl`).
 - Dual ESM + CommonJS build with type definitions, unit tests (Vitest), ESLint + Prettier, CI and release workflows.
 
-[Unreleased]: https://github.com/rice2411/spx-seller-api/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/rice2411/spx-seller-api/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/rice2411/spx-seller-api/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/rice2411/spx-seller-api/releases/tag/v0.1.0
